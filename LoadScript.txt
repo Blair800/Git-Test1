@@ -1,13 +1,243 @@
-----------------------------
+﻿///$tab PreLoad
+/* ----------------------------------------------------------------------------------
+To find current vaiables and template tools avaiable visit the confluence page
+https://confluenceokta.go.sohacloud.net/display/BI/Qlik+App+Template+Information
+----------------------------------------------------------------------------------*/
 
-this is a text file
 
 
--------------------------------
+//----------------------------------------------------------------------------------
+//-------------------------  Binary Load Below (if any) ----------------------------
+//----------------------------------------------------------------------------------
 
-more file 
 
--------------------------------------
 
-read this file
---------------------------------
+
+
+
+
+
+
+$(Must_Include=\\assofsv101fs\QLIKshare\SourceDocs\_Common2.0\QlikTemplateGlobalConfig_poc.qvs)
+/*----------------------------------------------------------------------------------
+NOTE: Application Log start includes the 'load start time.txt' file that logs the time
+of the load start.  No need to add it as a must include.
+----------------------------------------------------------------------------------*/
+CALL ApplicationLogStart;
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------------
+//------------------------------  Change Log Below ---------------------------------
+//----------------------------------------------------------------------------------
+
+change_log:
+load * inline [
+	RELEASE,DATE,DEV
+	'Initial Release','09/03/2020','jdom'
+	
+];
+
+STORE change_log into $(vAppName)_ChangeLog.txt(txt);
+///$tab inlines
+x.DateRange:
+ Load * inline [
+	Date Range
+	This Week
+	This Month
+	This Quarter
+	This Year
+	Last Week
+	Last Month
+	Last Quarter
+	Last Year
+];
+ 
+///$tab Main
+CALL TraceLogStart ('Practice','Loading all active practices','$(con_EDW)');
+
+D_Practice:
+LOAD *
+ ;
+SELECT [M_PracticeID]
+      ,[PracticeName] AS Practice
+      ,[PracticeNumber]
+      ,[PracticeGUID]
+      ,[PracticeSpecialty] AS 'LocationSpecialty'
+      ,[PracticeSpecialty] AS 'PrimarySpecialty'
+      ,[PracticeSpecialty] AS 'PhreesiaSpecialtySegment'
+  FROM $(vEDWDB).[dbo].[D_Practice]
+;
+	
+CALL TraceLogStop('D_Practice');
+
+
+
+CALL TraceLogStart ('D_PracticeLocation','The best sample messages','$(con_EDW)');
+
+D_PracticeLocation:
+LOAD *
+ ;
+SELECT [M_PracticeLocationID]
+      ,[PracticeLocationGUID]
+      ,[PracticeLocationName] AS Location
+      ,[Address1]
+      ,[Address2]
+      ,[City]
+      ,[State] AS 'LocationState'
+      ,[Zip]
+      ,[TimeZone]
+      ,[PracticeLocationStatus] AS 'LocationGroup'
+  FROM $(vEDWDB).[dbo].[D_PracticeLocation]
+;
+CALL TraceLogStop('D_PracticeLocation');
+
+
+
+CALL TraceLogStart ('D_Provider','Why did we have to do this','$(con_EDW)');
+
+D_Provider:
+LOAD *
+ ;
+SELECT [M_ProviderID]
+      ,[ProviderGUID]
+      ,[ProviderFirstName]
+      ,[ProviderMiddleName]
+      ,[ProviderLastName]
+      ,[ProviderFullName] AS 'Provider'
+      ,[ProviderFullName] AS 'Intake Staff'
+      ,[NationalProviderID]
+      ,[Prefix]
+      ,[Suffix]
+      ,[ProviderSpecialty]
+      ,[ProviderStatus]
+      ,[EntityType]
+  FROM $(vEDWDB).[dbo].[D_Provider]
+;
+CALL TraceLogStop('D_Provider');
+
+
+
+CALL TraceLogStart ('F_Visit','This is true','$(con_EDW)');
+
+F_Visit:
+LOAD *
+ ;
+ SQL
+SELECT [M_VisitID]
+,fv.[M_ZoneID]
+,fv.[M_PracticeLocationID]
+,dpl.M_PracticeID
+,[M_PatientID]
+,[M_ProviderID]
+,[M_VisitLocalDateID]
+,[M_VisitLocalDateID] AS M_VisitDateID
+,[M_VisitDateTimeUTCID]
+,[M_VisitStatusID]
+,[M_VisitGUIDID]
+,[M_InvoiceGUIDID]
+,[VisitLocalDate]
+,[VisitDateLocal]
+,[VisitDateTimeUTC]
+,[LastUpdatedDate]
+,[LastUpdatedDateUTC]
+FROM $(vEDWDB).[dbo].[F_Visit] fv
+INNER JOIN $(vEDWDB).[dbo].[D_PracticeLocation] dpl
+ON dpl.M_PracticeLocationID = fv.M_PracticeLocationID
+ON dpl.M_PracticeLocationID = fv.M_PracticeLocationID
+INNER JOIN $(vEDWDB).[dbo].[D_Calendar] dc
+ON dc.M_CalendarID = fv.M_VisitLocalDateID
+WHERE dc.FullDate >= '$(vBeginDate)'
+AND dc.FullDate <= '$(vEndDate)'
+;
+CALL TraceLogStop('F_Visit');
+
+
+CALL TraceLogStart ('Calendar','Sample message','$(con_EDW)');
+
+Calendar:
+Load distinct 
+	M_VisitDateID, 
+	date(floor(FullDate),'MM/DD/YY')			as VisitDate, 
+	date(monthstart(floor(FullDate)),'MMM-YY')	as VisitMoYr,
+	YearMonthNbr as YrMonthNbr,
+	WeekEnd(FullDate,0,6)						as VisitWeekEnd,
+	YearQtrName 								as VisitQuarter,
+	InMonthToDate(FullDate,'$(vToday)',0) * -1 	as [x.This Month],	
+	InYear(FullDate,'$(vToday)',0) * -1 		as [x.This Year],	
+	InQuarter(FullDate,'$(vToday)',0) * -1 		as [x.This Quarter],	
+	InWeek(FullDate,'$(vToday)',0,6) * -1 		as [x.This Week],
+	InWeek(FullDate,'$(vToday)',-1,6) * -1 		as [x.Last Week],
+	InMonth(FullDate,'$(vToday)',-1) * -1 		as [x.Last Month],
+	InQuarter(FullDate,'$(vToday)',-1) * -1 	as [x.Last Quarter],
+	InYear(FullDate,'$(vToday)',-1) * -1 		as [x.Last Year]
+WHERE Exists(M_VisitDateID)
+;
+SQL SELECT 
+    FullDate ,
+    M_CalendarID AS M_VisitDateID,
+    YearQtrName ,
+    YearMonthNbr
+FROM $(vEDWDB).dbo.D_Calendar dc
+WHERE EXISTS (SELECT 1 FROM $(vEDWDB).dbo.F_Visit fv
+			WHERE fv.M_VisitLocalDateID = dc.M_CalendarID
+			AND fv.VisitLocalDate >= '$(vBeginDate)')
+;
+CALL TraceLogStop('Calendar');
+///$tab Main End
+/*----------------------------------------------------------------------------------
+NOTE: Application Log stop includes the 'load stop time.txt' file that logs the time
+of the load stop.  No need to add it as a must include.
+----------------------------------------------------------------------------------*/
+CALL ApplicationLogStop;
+EXIT SCRIPT;
+
+
+//----------------------------------------------------------------------------------
+//-------------------  Available Variables as of Septemper 3,2020 ------------------
+//----------------------------------------------------------------------------------
+
+/*
+Available connection strings-- See confluence page above if not updated
+
+ConnectionName			  Server			  Environment			Category
+
+con_EDMart				  EDMARTMAIN			Prod				EDMart
+con_EDMart_Test		 	  ASSOSQLRPTV301		Test				EDMart
+con_EDMart_Dev			  ASSOBIDB301			Dev					EDMart
+con_EAP				 	  EAPDBMAINRO			Prod				RO
+con_Zone1				  Z1DBMAINRO			Prod				RO
+con_Zone2				  Z2DBMAINRO			Prod 				RO
+con_Zone3				  Z3DBMAINRO			Prod				RO
+con_TestNJ				  ASSOSQLV301			Test				RO
+con_EDW_Dev(Use con_EDW)  EDWDEV				Dev					EDW
+con_EDW_Prod(Use con_EDW) EDWMAIN				Prod				EDW
+con_SharedServices		  SHDBMAINRO			Prod				RO_Shared
+
+*/
+
+
+
+/*
+Available database variables-- See confluence page above if not updated
+Dev variables in the config file will be read in dev instead of the production values
+but are ignored in prod
+
+DatabaseVariableName	 		 Production Value		        Set Dev Value with variable in config
+
+ vEDWDB						    	EDW							    vDevEDWDB
+ vReportOpsDB		 	  	        ReportOps					    vDevReportOpsDB
+ vSalesForceDB			   	        SalesForce_backups 				vDevSalesForceDB
+ vEDMartDB 				  		    EDMart							vDevEDMartDB
+ vDataPondDB  					    DataPond						vDevDataPondDB
+ vODSDB  					 	    ODS								vDevODSDB
+ vDatasolDB 					    Datasol							vDevDatasolDB
+ vQuestionAnswerDB 				    QuestionAnswer					vDevQuestionAnswerDB
+ vPatientCommunications_EDMARTDB    PatientCommunications_EDMART    vDevPatientCommunications_EDMARTDB
+
+*/
