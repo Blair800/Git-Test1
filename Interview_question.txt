@@ -1,0 +1,20 @@
+What is your daily jobs in XXX?
+What is different between SQL and hive
+How do you run Hive queries (HUE (UI) or Beeline(Command line)
+How to delete a record in hive table by Hive?
+How to compare two tables with a unique identifier?
+How to compare two tables without unique identifier, such as a customer address table one customer has multiple addresses
+Python Skills 
+Is Python case sensitive
+How to hand error message?
+How to compare two csv or excel file with python?
+Aotomation
+ Do you build or use any automation frameworks?
+DevOps
+How do you integrate your testing with Jenkins?
+AWS/Big data
+Any Hadoopand linux commands do you use on your job?
+Tell me about a time when people disagreed with your ideas. What did you do?
+What Is The Most Challenging Project You’ve Worked On? What is your solutions?
+What did you learn from your previous company experiences and what can you improve?
+Are you conformable to write scripts
